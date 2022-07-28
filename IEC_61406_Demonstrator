@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-
-  
+# IEC 61406 - Indentifier Generator
+# (c) Dr. Michael Rudschuck, DKE  Deutsche Kommission Elektrotechnik Elektronik Informationstechnik
+# (further information: https://github.com/DIN-DKE)
 
 
 
@@ -19,7 +20,6 @@ if [[ $(uname -s) == CYGWIN* ]];then
     TMP_1=$(mktemp -u --suffix=.png)
 fi
 #END Generating temp file
-
 
 
 
