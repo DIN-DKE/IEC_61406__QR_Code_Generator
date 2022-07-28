@@ -1,0 +1,323 @@
+#!/usr/bin/env bash
+
+
+  
+
+
+
+#START Generating temp file
+#DO:          Set temporary file for output of convert.
+#             Note: Cygwin needs special handling (at least on my computer).
+#                   The Cygwin workaround is NOT threadsafe!
+#REV:         0.1: First release
+#PARAMETER:   -
+#RETURNS:     -  
+
+if [[ $(uname -s) == CYGWIN* ]];then
+    TMP_1=temp.png
+ else 
+    TMP_1=$(mktemp -u --suffix=.png)
+fi
+#END Generating temp file
+
+
+
+
+
+#START Set Global vars
+#DO:        Set global vars
+#           Note: All global vars have the prefix >GLOBAL_<
+#REV:       0.1: First release 
+#PARAMETER: -
+#RETURNS:   -
+
+GLOBAL_name="IEC_61406_Demonstrator"
+GLOBAL_version="0.1"                     # Software Version
+GLOBAL_text="https://www.dke.de/en/areas-of-work/industry/news/digital-nameplate-foundation-for-industrie-40" # Default input 
+GLOBAL_out="Digital-Identifier-Demo.png" # Default output 
+GLOBAL_size=10                           # Module size in pixels
+GLOBAL_quiet=0                           # Default is phony
+#END Set Global vars
+
+
+
+
+
+version () {
+#DO:         Prints out program version.
+#REV:        0.1: first release 
+#PARAMETER:  ./.
+#RETURNS:    ./.
+  echo "Version: $GLOBAL_version" 
+}
+
+
+
+
+copyright () {
+#DO:         Prints out copyright information.
+#REV:        0.1: first release 
+#PARAMETER:  ./.
+#RETURNS:    ./.
+  echo "IEC 61406 indentifier generator"
+  echo "Copyright: (c) Michael Rudschuck 2022"
+  echo "Licence:  GPLv3"
+}
+
+
+help () {
+#DO:         Prints out help information.
+#REV:        0.1: first release 
+#PARAMETER:  ./.
+#RETURNS:    ./.
+
+echo "
+NAME
+
+    IEC 61406 - Indentifier Generator
+
+SYNOPSIS
+
+    IEC_61406_Demonstrator [-xyz] <uri> <file> 
+
+DESCRIPTION
+
+    IEC_61406_Demonstrator will generate a QR-code aacording to IEC 61406.
+    
+OPTIONS
+    -h , usage and options (help) 
+
+LICENCE 
+
+    This program is distributed under the terms of the GNU General Public License (GPLv3).  
+
+AUTHOR
+
+     (c) Michael Rudschuck, michael.rudschuck@vde.com
+
+HISTORY
+
+    2022-07-27 - v0.1 - first version
+
+TODO
+
+    - make cygwin-version threadsafe
+    - check error correcting level of QR
+" 
+
+exit
+}
+
+
+usage () {
+#DO:         Prints out help usage.
+#REV:        0.1: first release 
+#PARAMETER:  ./.
+#RETURNS:    ./.
+  echo "Usage:"
+  echo "$GLOBAL_name \"http://Your.text.here\" \"output_qr.png\""
+  echo "Type $GLOBAL_name -h for more help."
+}
+
+
+diagnostics () {
+#DO:         Checks for mandatory dependencies.
+#REV:        0.1: first release 
+#PARAMETER:  ./.
+#RETURNS:    ./.
+  echo ""
+  echo "Starting diagnostics:"
+  echo "-> checking for ImageMagick"
+  convert -version 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "Cannot call ImageMagick!"
+    echo "Check installation."
+  fi
+  echo "-> checking for qrencode"
+  qrencode -V 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "Cannot call qrencode!"
+    echo "Check of qrencode is installed."
+    echo "If qrencode is not part of your distribution try:"
+    echo 'git clone https://github.com/fukuchi/libqrencode'
+    echo 'cd ./libqrencode/'
+    echo 'cmake .'
+    echo 'make'
+    echo 'sudo make install'
+    echo ""
+  fi
+  echo "Finished diagnostics."
+}
+
+
+PrintOut () {
+#DO:         Helper function to reduce verbosity.
+#REV:        0.1: first release 
+#PARAMETER:  $1: string
+#RETURNS:    ./.
+if [ "$GLOBAL_quiet" -eq "0" ]; then
+  echo $1;
+fi
+}
+
+
+
+
+
+#START Handling of command line options
+#DO:         Helper function to reduce verbosity.
+#REV:        0.1: first release 
+#PARAMETER:  $1: string
+#RETURNS:    ./.
+
+VALID_ARGS=$(getopt -o hq:vs:D --long help,quiet:,version,size: -- "$@")
+if [[ $? -ne 0 ]]; then
+    exit 1;
+fi
+
+eval set -- "$VALID_ARGS"
+while [ : ]; do
+  case "$1" in
+    -D)
+        copyright
+        version 
+        diagnostics 
+        exit   
+        shift
+        ;;
+
+    -h | --help)
+        copyright
+        version 
+        usage 
+        help
+        exit   
+        shift
+        ;;
+   -q | --quiet)
+        GLOBAL_quiet=$2 
+        shift 2
+        ;;
+    -v | --version)
+        copyright 
+        version
+        exit
+        shift
+        ;;
+    -s | --size)
+        re='^[0-9]+$'
+        if ! [[ $2 =~ $re ]] ; then
+        copyright
+        echo "error: $2 is not a number" >&2; exit 1
+        fi        
+        GLOBAL_size=$2
+        shift 2
+        ;;
+    --) shift;
+       
+        if [ -z "$1" ]
+           then
+             copyright 
+             echo "error: \$1 is empty" >&2 
+             usage
+             exit 1
+           fi
+         
+          if [ -z "$2" ]
+           then
+              copyright
+              echo "error: \$2 is empty" >&2
+              usage
+              exit 1
+           fi  
+        
+           GLOBAL_text=$1
+           GLOBAL_out=$2
+        shift 2
+        break
+        ;;
+  esac
+done
+
+if [ "$GLOBAL_quiet" -eq "0" ]; then
+   copyright
+   echo "Verbose mode is on."
+   fi
+
+#END Handling of command line options
+
+
+
+#START Check if output is stdout
+
+if [ "$GLOBAL_out" = "-" ]; then
+   if [ "$GLOBAL_quiet" -eq "0" ]; then
+   GLOBAL_quiet=1 
+   echo "WARNING: In pipe mode the quiet flag will be ignored." >&2
+   fi
+fi
+
+#END Check if output is stdout
+
+
+
+
+PrintOut "Created: $TMP_1"
+
+
+
+#START Check / Calculate IEC 61406 compliance
+
+#DO:         Checking for IEC 61406 compliance 
+#            and calculating boarder
+#REV:        0.1: First release
+#PARAMETER:  -
+#RETURNS:    -   
+
+GLOBAL_border=5                          # White border:  4+1 Modules
+GLOBAL_rim=$(($GLOBAL_size * 1))         # Black border:    1 Module
+GLOBAL_triangle=$(($GLOBAL_size * 7))    # Size triangle: 6+1 Modules
+GLOBAL_resolution=300                    # Bitmap resolution
+
+regex='^(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]\.[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]$'
+
+if [[ $GLOBAL_text =~ $regex ]]
+then 
+     PrintOut "Text is valid."
+else
+    PrintOut "WARNING: Text is not valid for IEC 61406 ($GLOBAL_text)." >&2 
+fi
+
+#END Check / Calculate IEC 61406 compliance
+
+
+
+
+qrencode $GLOBAL_text -o $TMP_1 -s $GLOBAL_size -m $GLOBAL_border -d GLOBAL_resolution $GLOBAL_text
+
+PrintOut "Calculated sizes."
+
+size=$(magick identify -format '%[fx:w]' $TMP_1 )
+
+PrintOut "Size of QR: $size"
+
+
+PrintOut "Created QR-Bitmap."
+
+convert $TMP_1 -fill black -stroke black -bordercolor black \
+ -shave $GLOBAL_rim -border $GLOBAL_rim \
+ -draw "path 'M $size,$size L $(($size-$GLOBAL_triangle)),$size L $size,$(($size-$GLOBAL_triangle)) Z ' " \
+ $GLOBAL_out
+
+PrintOut "Created QR-Bitmap (IEC 61406)."
+
+
+
+### remove temporary file
+rm  $TMP_1
+
+
+PrintOut "Finished."
+
+
+### Well Done!
